@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relations Explorer</title>
+<style>
+:root{
+  --blue:#2457a6; --blue2:#eaf2ff; --maroon:#7b2346;
+  --green:#197a4b; --red:#b42318; --ink:#182230; --muted:#657184;
+  --line:#d8dee8; --panel:#f7f9fc; --white:#fff;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--ink);background:#fff}
+button,select{font:inherit}
+.app{max-width:1180px;margin:auto;padding:22px}
+header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid var(--blue);padding-bottom:16px}
+h1{margin:0;font-size:30px;color:#173b73}
+.subtitle{margin:5px 0 0;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,button{border:1px solid #b9c3d1;border-radius:8px;padding:9px 13px;background:#fff;cursor:pointer}
+button.primary{background:var(--blue);color:white;border-color:var(--blue)}
+button.active{background:var(--blue2);border-color:var(--blue);color:#173b73;font-weight:700}
+button:focus-visible,select:focus-visible{outline:3px solid #9cc2ff;outline-offset:2px}
+.steps{display:flex;gap:6px;overflow:auto;margin:18px 0}
+.step{white-space:nowrap;padding:8px 12px;border-radius:20px;background:#eef1f5;color:#647083;font-size:13px}
+.step.on{background:var(--blue);color:#fff}
+.step.done{background:#e7f4ed;color:#17663f;border:1px solid #a9d5bd}
+.grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px}
+.panel{border:1px solid var(--line);border-radius:12px;padding:16px;background:#fff}
+.panel h2{font-size:18px;margin:0 0 12px}
+.panel h3{font-size:15px;margin:18px 0 8px}
+.small{font-size:13px;color:var(--muted)}
+.matrix-wrap{overflow:auto}
+.matrix{border-collapse:separate;border-spacing:5px;margin:auto}
+.matrix th{font-size:13px;color:#45546a;min-width:44px}
+.matrix td{padding:0}
+.cell{width:48px;height:48px;border:1px solid #bfc8d6;border-radius:8px;background:#f5f7fa;font-weight:700}
+.cell.on{background:#dce9ff;border-color:var(--blue);color:#173b73}
+.cell.diag.on{background:#e3f5ea;border-color:#48a875;color:#14613b}
+.cell.violation{background:#ffe2df;border-color:#d64a3d;color:#8b1d15}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:12px;color:var(--muted)}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:-2px;margin-right:4px}
+svg{width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:#fbfcfe}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.status{padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.status strong{display:block;margin-bottom:3px}
+.good{color:var(--green)} .bad{color:var(--red)}
+.reason{margin-top:12px;padding:12px;border-radius:9px;background:#fff7e6;border:1px solid #efd08c;font-size:13px;line-height:1.5}
+.equiv{margin-top:14px;padding:14px;border-radius:10px;background:#f2fbf6;border:1px solid #9bd4b5}
+.classes{display:flex;flex-wrap:wrap;gap:10px}
+.class-card{padding:12px;border-radius:10px;border:2px solid #b8c4d5;background:#f8fafc;cursor:pointer}
+.class-card.sel{border-color:var(--maroon);background:#fff1f6}
+.partition-box{padding:14px;background:#f7f2ff;border:1px solid #d3b8ee;border-radius:10px}
+.class-points{font-family:Georgia,serif;font-size:18px}
+footer{margin-top:18px;color:var(--muted);font-size:12px;text-align:center}
+@media(max-width:800px){.grid{grid-template-columns:1fr}header{flex-direction:column}.app{padding:14px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+<header>
+  <div>
+    <h1>Relations Explorer</h1>
+    <div class="subtitle">From ordered pairs to equivalence classes and partitions</div>
+  </div>
+  <div class="controls">
+    <label class="small" for="size">Set:</label>
+    <select id="size">
+      <option value="2">A = {1, 2}</option>
+      <option value="3" selected>A = {1, 2, 3}</option>
+      <option value="4">A = {1, 2, 3, 4}</option>
+      <option value="5">A = {1, 2, 3, 4, 5}</option>
+    </select>
+    <button id="clear" type="button">Clear</button>
+    <button id="examples" type="button">Examples ▾</button>
+  </div>
+</header>
+
+<div class="steps" aria-label="Learning stages">
+  <div class="step on" data-step="1">1. Build $R$</div>
+  <div class="step" data-step="2">2. Check properties</div>
+  <div class="step" data-step="3">3. Equivalence relation</div>
+  <div class="step" data-step="4">4. Equivalence classes</div>
+  <div class="step" data-step="5">5. Partition</div>
+</div>
+
+<div class="grid">
+<section class="panel">
+  <h2>1. Build the relation</h2>
+  <p class="small">Click a cell to include or remove the ordered pair. Rows give the first element and columns give the second.</p>
+  <div class="matrix-wrap" id="matrix"></div>
+  <div class="legend">
+    <span><i class="dot" style="background:#dce9ff"></i>included pair</span>
+    <span><i class="dot" style="background:#e3f5ea"></i>included self-pair</span>
+    <span><i class="dot" style="background:#ffe2df"></i>property violation</span>
+  </div>
+
+  <h3>Ordered-pair form</h3>
+  <div id="pairs" class="small"></div>
+
+  <h3>Digraph</h3>
+  <svg id="graph" viewBox="0 0 600 340" role="img" aria-label="Directed graph of the relation"></svg>
+</section>
+
+<section class="panel">
+  <h2>2. Check the relation</h2>
+  <div class="status-grid">
+    <div class="status" id="reflexive"></div>
+    <div class="status" id="symmetric"></div>
+    <div class="status" id="antisymmetric"></div>
+    <div class="status" id="transitive"></div>
+  </div>
+  <div class="reason" id="reason">Build a relation to see the property checks.</div>
+
+  <div class="equiv" id="equivBox">
+    <strong id="equivTitle">Equivalence relation</strong>
+    <div id="equivText" class="small">A relation is an equivalence relation exactly when it is reflexive, symmetric, and transitive.</div>
+  </div>
+
+  <h2 style="margin-top:20px">3. Equivalence classes</h2>
+  <div id="classes" class="small">First construct an equivalence relation.</div>
+
+  <h2 style="margin-top:20px">4. Partition</h2>
+  <div id="partition" class="partition-box small">
+    The equivalence classes will form a partition when an equivalence relation is present.
+  </div>
+</section>
+</div>
+
+<footer>Discrete Mathematics &amp; Graph Theory · Interactive teaching resource</footer>
+
+<script>
+(() => {
+"use strict";
+
+const root=document.getElementById("app");
+const sizeEl=document.getElementById("size");
+const matrixEl=document.getElementById("matrix");
+const pairsEl=document.getElementById("pairs");
+const graphEl=document.getElementById("graph");
+const reasonEl=document.getElementById("reason");
+const classesEl=document.getElementById("classes");
+const partitionEl=document.getElementById("partition");
+const examplesBtn=document.getElementById("examples");
+const NAMES=["1","2","3","4","5"];
+let n=3, R=new Set(), selectedClass=-1;
+
+const key=(i,j)=>i+","+j;
+const has=(i,j)=>R.has(key(i,j));
+const setR=(i,j,v)=>v?R.add(key(i,j)):R.delete(key(i,j));
+
+function pairText(i,j){return "("+NAMES[i]+","+NAMES[j]+")";}
+
+function resetRelation(){R=new Set();selectedClass=-1;render();}
+
+function loadPairs(pairs){
+  R=new Set(pairs.map(([i,j])=>key(i,j)));
+  selectedClass=-1; render();
+}
+
+function examplesMenu(){
+  const old=root.querySelector(".example-menu");
+  if(old){old.remove();return;}
+  const menu=document.createElement("div");
+  menu.className="example-menu";
+  menu.style.cssText="position:absolute;right:22px;top:70px;background:white;border:1px solid #ccd4df;border-radius:10px;padding:8px;box-shadow:0 8px 25px rgba(20,40,70,.12);z-index:5;display:grid;gap:5px";
+  const items=[
+    ["Equality","All (a,a)"],
+    ["≤","a ≤ b"],
+    ["<","a < b"],
+    ["Congruence-like","Same remainder when divided by 2"],
+    ["Not equivalence","A simple non-transitive relation"]
+  ];
+  items.forEach(([name,desc],idx)=>{
+    const b=document.createElement("button"); b.type="button";
+    b.textContent=name+" — "+desc; b.style.textAlign="left";
+    b.addEventListener("click",()=>{menu.remove(); loadExample(idx);});
+    menu.appendChild(b);
+  });
+  root.appendChild(menu);
+}
+
+function loadExample(idx){
+  const p=[];
+  if(idx===0){
+    for(let i=0;i<n;i++)p.push([i,i]);
+  } else if(idx===1){
+    for(let i=0;i<n;i++)for(let j=i;j<n;j++)p.push([i,j]);
+  } else if(idx===2){
+    for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)p.push([i,j]);
+  } else if(idx===3){
+    // Same remainder when divided by 2.
+    for(let i=0;i<n;i++)for(let j=0;j<n;j++)if(i%2===j%2)p.push([i,j]);
+  } else {
+    if(n>=3)p.push([0,1],[1,2]); else p.push([0,1]);
+  }
+  loadPairs(p);
+}
+
+function properties(){
+  let reflexive=true,symmetric=true,antisymmetric=true,transitive=true;
+  let violations={reflexive:[],symmetric:[],antisymmetric:[],transitive:[]};
+  for(let i=0;i<n;i++)if(!has(i,i)){reflexive=false;violations.reflexive.push([i,i]);}
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+    if(has(i,j)&&!has(j,i)){symmetric=false;violations.symmetric.push([i,j]);}
+    if(i!==j&&has(i,j)&&has(j,i)){antisymmetric=false;violations.antisymmetric.push([i,j]);}
+  }
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)if(has(i,j))
+    for(let k=0;k<n;k++)if(has(j,k)&&!has(i,k)){
+      transitive=false;violations.transitive.push([i,j,k]);
+    }
+  return {reflexive,symmetric,antisymmetric,transitive,violations};
+}
+
+function makeStatus(id,label,value){
+  const el=document.getElementById(id);
+  el.innerHTML="<strong>"+label+"</strong><span class='"+(value?"good":"bad")+"'>"+(value?"✓ Satisfies":"✗ Does not satisfy")+"</span>";
+}
+
+function firstReason(p){
+  if(!p.reflexive){
+    const [i]=p.violations.reflexive[0];
+    return "Reflexivity fails because "+pairText(i,i)+" is missing. Every element must be related to itself.";
+  }
+  if(!p.symmetric){
+    const [i,j]=p.violations.symmetric[0];
+    return "Symmetry fails because "+pairText(i,j)+" is present but "+pairText(j,i)+" is missing.";
+  }
+  if(!p.antisymmetric){
+    const [i,j]=p.violations.antisymmetric[0];
+    return "Antisymmetry fails because both "+pairText(i,j)+" and "+pairText(j,i)+" are present while "+NAMES[i]+" ≠ "+NAMES[j]+".";
+  }
+  if(!p.transitive){
+    const [i,j,k]=p.violations.transitive[0];
+    return "Transitivity fails because "+pairText(i,j)+" and "+pairText(j,k)+" are present, but "+pairText(i,k)+" is missing.";
+  }
+  return "All four properties are satisfied for this relation.";
+}
+
+function getClasses(){
+  const p=properties();
+  if(!(p.reflexive&&p.symmetric&&p.transitive))return null;
+  const seen=new Set(), out=[];
+  for(let i=0;i<n;i++){
+    if(seen.has(i))continue;
+    const cls=[];
+    for(let j=0;j<n;j++)if(has(j,i))cls.push(j);
+    cls.forEach(x=>seen.add(x));
+    out.push(cls);
+  }
+  return out;
+}
+
+function renderMatrix(p){
+  let html="<table class='matrix'><tr><th></th>";
+  for(let j=0;j<n;j++)html+="<th>"+NAMES[j]+"</th>";
+  html+="</tr>";
+  for(let i=0;i<n;i++){
+    html+="<tr><th>"+NAMES[i]+"</th>";
+    for(let j=0;j<n;j++){
+      const v=has(i,j), viol=propertyViolation(p,i,j);
+      html+="<td><button type='button' class='cell "+(v?"on ":"")+(i===j?"diag ":"")+(viol?"violation":"")+"' data-i='"+i+"' data-j='"+j+"' aria-label='"+pairText(i,j)+" "+(v?"included":"not included")+"'>"+(v?"1":"0")+"</button></td>";
+    }
+    html+="</tr>";
+  }
+  html+="</table>";
+  matrixEl.innerHTML=html;
+  matrixEl.querySelectorAll(".cell").forEach(b=>b.addEventListener("click",()=>{
+    const i=Number(b.dataset.i),j=Number(b.dataset.j);setR(i,j,!has(i,j));selectedClass=-1;render();
+  }));
+}
+
+function propertyViolation(p,i,j){
+  return (!p.reflexive&&i===j&&!has(i,j)) ||
+         (!p.symmetric&&has(i,j)&&!has(j,i)) ||
+         (!p.antisymmetric&&i!==j&&has(i,j)&&has(j,i));
+}
+
+function renderPairs(){
+  const arr=[];
+  for(const s of R){const [i,j]=s.split(",").map(Number);arr.push(pairText(i,j));}
+  arr.sort();
+  pairsEl.innerHTML=arr.length?"R = { "+arr.join(", ")+" }":"R = ∅";
+}
+
+function nodePos(i){
+  const cx=300,cy=170,rad=Math.min(105,42+n*15);
+  const a=-Math.PI/2+(2*Math.PI*i/n);
+  return {x:cx+rad*Math.cos(a),y:cy+rad*Math.sin(a)};
+}
+
+function renderGraph(p,classes){
+  while(graphEl.firstChild)graphEl.removeChild(graphEl.firstChild);
+  const ns="http://www.w3.org/2000/svg";
+  const defs=document.createElementNS(ns,"defs");
+  const marker=document.createElementNS(ns,"marker");
+  marker.setAttribute("id","arrow");marker.setAttribute("viewBox","0 0 10 10");
+  marker.setAttribute("refX","9");marker.setAttribute("refY","5");
+  marker.setAttribute("markerWidth","6");marker.setAttribute("markerHeight","6");marker.setAttribute("orient","auto-start-reverse");
+  const path=document.createElementNS(ns,"path");path.setAttribute("d","M 0 0 L 10 5 L 0 10 z");path.setAttribute("fill","#456");
+  marker.appendChild(path);defs.appendChild(marker);graphEl.appendChild(defs);
+
+  // Edges first.
+  for(const s of R){
+    const [i,j]=s.split(",").map(Number);
+    const a=nodePos(i),b=nodePos(j);
+    const line=document.createElementNS(ns,"path");
+    line.setAttribute("fill","none");line.setAttribute("stroke","#718096");line.setAttribute("stroke-width","2");
+    line.setAttribute("marker-end","url(#arrow)");
+    if(i===j){
+      line.setAttribute("d","M "+(a.x+12)+" "+(a.y-5)+" C "+(a.x+50)+" "+(a.y-55)+", "+(a.x-50)+" "+(a.y-55)+", "+(a.x-12)+" "+(a.y-5));
+    }else{
+      const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+      const ux=dx/len,uy=dy/len;
+      const x1=a.x+ux*24,y1=a.y+uy*24,x2=b.x-ux*27,y2=b.y-uy*27;
+      line.setAttribute("d","M "+x1+" "+y1+" L "+x2+" "+y2);
+    }
+    graphEl.appendChild(line);
+  }
+
+  for(let i=0;i<n;i++){
+    const q=nodePos(i);
+    const circle=document.createElementNS(ns,"circle");
+    circle.setAttribute("cx",q.x);circle.setAttribute("cy",q.y);circle.setAttribute("r","24");
+    circle.setAttribute("fill","#eef4ff");circle.setAttribute("stroke","#2457a6");circle.setAttribute("stroke-width","2");
+    if(classes&&selectedClass>=0&&classes[selectedClass]?.includes(i)){circle.setAttribute("fill","#ffe6f0");circle.setAttribute("stroke","#7b2346");circle.setAttribute("stroke-width","3");}
+    graphEl.appendChild(circle);
+    const text=document.createElementNS(ns,"text");text.setAttribute("x",q.x);text.setAttribute("y",q.y+6);text.setAttribute("text-anchor","middle");text.setAttribute("font-size","16");text.setAttribute("font-weight","700");text.textContent=NAMES[i];
+    graphEl.appendChild(text);
+  }
+}
+
+function renderClasses(classes){
+  if(!classes){
+    classesEl.innerHTML="<span class='small'>The current relation is not an equivalence relation, so equivalence classes are not formed here.</span>";
+    partitionEl.innerHTML="The relation must be reflexive, symmetric, and transitive before we form its equivalence classes.";
+    return;
+  }
+  classesEl.innerHTML="<div class='classes'></div><p class='small' style='margin-top:10px'>Click a class to highlight its elements in the digraph.</p>";
+  const wrap=classesEl.querySelector(".classes");
+  classes.forEach((cls,idx)=>{
+    const b=document.createElement("button");b.type="button";b.className="class-card "+(idx===selectedClass?"sel":"");
+    b.innerHTML="<strong>["+NAMES[cls[0]]+"]</strong><div class='class-points'>{ "+cls.map(x=>NAMES[x]).join(", ")+" }</div>";
+    b.addEventListener("click",()=>{selectedClass=selectedClass===idx?-1:idx;render();});
+    wrap.appendChild(b);
+  });
+  partitionEl.innerHTML="<strong>Partition of A</strong><br><br><span class='class-points'>{ "+
+    classes.map(c=>"{"+c.map(x=>NAMES[x]).join(", ")+"}").join(", ")+
+    " }</span><br><br><span class='small'>✓ Every block is non-empty &nbsp; ✓ Blocks cover A &nbsp; ✓ Distinct blocks are pairwise disjoint</span>";
+}
+
+function updateSteps(p, classes){
+  const steps=[...root.querySelectorAll('.step')];
+  steps.forEach((el,i)=>{
+    el.classList.remove('on','done');
+    el.removeAttribute('aria-current');
+    const k=i+1;
+    let complete=false;
+    if(k===1) complete=R.size>0;
+    if(k===2) complete=R.size>0;
+    if(k===3) complete=p.reflexive&&p.symmetric&&p.transitive;
+    if(k===4) complete=!!classes;
+    if(k===5) complete=!!classes;
+    if(complete) el.classList.add('done');
+  });
+
+  let current=1;
+  if(R.size>0) current=2;
+  if(p.reflexive&&p.symmetric&&p.transitive) current=3;
+  if(classes) current=5;
+  const active=steps[current-1];
+  if(active){ active.classList.add('on'); active.setAttribute('aria-current','step'); }
+}
+
+function render(){
+  n=Math.max(2,Math.min(5,Number(sizeEl.value)||3));
+  for(const s of [...R]){const [i,j]=s.split(",").map(Number);if(i>=n||j>=n)R.delete(s);}
+  const p=properties();
+  renderMatrix(p);renderPairs();
+  makeStatus("reflexive","Reflexive",p.reflexive);
+  makeStatus("symmetric","Symmetric",p.symmetric);
+  makeStatus("antisymmetric","Antisymmetric",p.antisymmetric);
+  makeStatus("transitive","Transitive",p.transitive);
+  reasonEl.textContent=firstReason(p);
+  const isEq=p.reflexive&&p.symmetric&&p.transitive;
+  document.getElementById("equivTitle").innerHTML=isEq?"✓ This is an Equivalence Relation":"Equivalence Relation: not satisfied";
+  document.getElementById("equivTitle").className=isEq?"good":"bad";
+  document.getElementById("equivText").textContent=isEq
+    ?"Reflexive + symmetric + transitive. We can now form the equivalence classes."
+    :"An equivalence relation must be reflexive, symmetric, and transitive.";
+  const classes=getClasses();
+  renderGraph(p,classes);renderClasses(classes);
+  updateSteps(p,classes);
+}
+
+sizeEl.addEventListener("change",resetRelation);
+document.getElementById("clear").addEventListener("click",resetRelation);
+examplesBtn.addEventListener("click",examplesMenu);
+document.addEventListener("click",e=>{
+  const menu=root.querySelector(".example-menu");
+  if(menu && !menu.contains(e.target) && e.target!==examplesBtn)menu.remove();
+});
+render();
+})();
+</script>
+</body>
+</html>
