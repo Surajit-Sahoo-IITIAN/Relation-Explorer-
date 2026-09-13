@@ -1,7 +1,7 @@
 # Relations Explorer
 
 An interactive visualization for **Discrete Mathematics & Graph Theory** that helps students understand the progression from a relation to an equivalence relation, equivalence classes, and partitions.
-
+Click For Visualization (https://surajit-sahoo-iitian.github.io/Relation-Explorer-/)
 ## What Students Can Explore
 
 The visualization follows the mathematical flow:
